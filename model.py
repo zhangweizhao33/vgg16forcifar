@@ -16,6 +16,7 @@ import json
 import glob
 import keras.backend as K
 from keras.utils import plot_model
+import pickle
 def change_dim(input):
     return tf.stack(tf.split(input,3,axis=-1))
 def cat(input):
@@ -274,26 +275,27 @@ def train_model(result_path):
     print('Test loss:', loss)
     print('Test accuracy:', acc)
     model.save_weights("./my_model.h5")
-    #     loss, acc = model.evaluate(val_data, val_label, verbose=0)
-    #     print('Test loss:', loss)
-    #     print('Test accuracy:', acc)
-    #     model.save_weights("./my_model.h5")
-    #     plt.plot(history.history['acc'])
-    #     plt.plot(history.history['val_acc'])
-    #     plt.title('Model accuracy')
-    #     plt.ylabel('Accuracy')
-    #     plt.xlabel('Epoch')
-    #     plt.legend(['Train', 'Test'], loc='upper left')
-    #     plt.show()
-    #
-    #     # 绘制训练 & 验证的损失值
-    #     plt.plot(history.history['loss'])
-    #     plt.plot(history.history['val_loss'])
-    #     plt.title('Model loss')
-    #     plt.ylabel('Loss')
-    #     plt.xlabel('Epoch')
-    #     plt.legend(['Train', 'Test'], loc='upper left')
-    #     plt.show()
+    file = open('./history.pkl', 'wb')
+    pickle.dump(history.history, file)
+    file.close()
+    fig = plt.figure()  # 新建一张图
+    plt.plot(history.history['acc'], label='training acc')
+    plt.plot(history.history['val_acc'], label='val acc')
+    plt.title('model accuracy')
+    plt.ylabel('accuracy')
+    plt.xlabel('epoch')
+    plt.legend(loc='lower right')
+    fig.savefig('./VGG16+Unet_acc.png')
+    fig = plt.figure()
+    plt.plot(history.history['loss'], label='training loss')
+    plt.plot(history.history['val_loss'], label='val loss')
+    plt.title('model loss')
+    plt.ylabel('loss')
+    plt.xlabel('epoch')
+    plt.legend(loc='upper right')
+    fig.savefig('./VGG16+Unet_loss.png')
+
+
 
 
 
