@@ -21,67 +21,75 @@ def change_dim(input):
     return tf.stack(tf.split(input,3,axis=-1))
 def cat(input):
     return tf.concat((input[0],input[1]),axis=-1)
+def SSIM(input):
+    return tf.image.ssim(input[0],input[1],max_val=1)
+def reshape_half(input):
+    return tf.image.resize_images(input,tf.constant([400,400]),method=0)
+def reshape_qtr(input):
+    return tf.image.resize_images(input,tf.constant([200,200]),method=0)
 def vgg_16(height=None,width=None):
-    #conv block
+
     ldr_tensor=Input(shape=(height,width,9),name="hdr")
-    #ldr_reshape=Input(shape=(3,height,width,3),name="hdr_reshape")
-    ldr_reshape = Lambda(change_dim)(ldr_tensor)
-    #ldr_reshape=KL.Lambda(lambda x: K.tf.stack(K.tf.split(ldr_tensor,3,axis=-1), name='ldr_reshape'))(ldr_tensor)
+    gd=Input(shape=(height,width,3),name="groud_truth")
+    gd_half =Lambda(reshape_half)(gd)
+    gd_qtr=Lambda(reshape_qtr)(gd)
+    #ldr_reshape = Lambda(change_dim)(ldr_tensor)
+    # conv block
     x = Conv2D(64, (3, 3), activation='relu', padding='same', name='encoder1_conv1',use_bias=True)(ldr_tensor)
-    x = Conv2D(64, (3, 3), activation='relu', padding='same', name='encoder1_conv2',use_bias=True)(x)
-    #x = MaxPooling2D((2, 2), strides=(2, 2), name='block1_pool')(x)
-    x_1=Conv2D(64,(3,3),strides=(2,2),activation='relu',padding='same',name='block1_conv3',use_bias=True)(x)
+    x_1 = Conv2D(64, (3, 3), activation='relu', padding='same', name='encoder1_conv2',use_bias=True)(x)
+    x=Conv2D(64,(3,3),strides=(2,2),activation='relu',padding='same',name='block1_conv3',use_bias=True)(x)
 
     # Block 2
-    x = Conv2D(128, (3, 3), activation='relu', padding='same', name='encoder2_conv1',use_bias=True)(x_1)
-    x = Conv2D(128, (3, 3), activation='relu', padding='same', name='encoder2_conv2',use_bias=True)(x)
-    #x = MaxPooling2D((2, 2), strides=(2, 2), name='block2_pool')(x)
-    x_2= Conv2D(128, (3, 3),strides=(2,2), activation='relu', padding='same', name='block2_conv3',use_bias=True)(x)
+    x = Conv2D(128, (3, 3), activation='relu', padding='same', name='encoder2_conv1',use_bias=True)(x)
+    x_2 = Conv2D(128, (3, 3), activation='relu', padding='same', name='encoder2_conv2',use_bias=True)(x)
+    x= Conv2D(128, (3, 3),strides=(2,2), activation='relu', padding='same', name='block2_conv3',use_bias=True)(x_2)
+
     # Block 3
-    x = Conv2D(256, (3, 3), activation='relu', padding='same', name='encoder3_conv1',use_bias=True)(x_2)
+    x = Conv2D(256, (3, 3), activation='relu', padding='same', name='encoder3_conv1',use_bias=True)(x)
     x = Conv2D(256, (3, 3), activation='relu', padding='same', name='encoder3_conv2',use_bias=True)(x)
-    x = Conv2D(256, (3, 3), activation='relu', padding='same', name='encoder3_conv3',use_bias=True)(x)
-    #x = MaxPooling2D((2, 2), strides=(2, 2), name='block3_pool')(x)
-    x_3 = Conv2D(256, (3, 3), strides=(2,2),activation='relu', padding='same', name='block3_conv4',use_bias=True)(x)
+    x_3 = Conv2D(256, (3, 3), activation='relu', padding='same', name='encoder3_conv3',use_bias=True)(x)
+    x = Conv2D(256, (3, 3), strides=(2,2),activation='relu', padding='same', name='block3_conv4',use_bias=True)(x_3)
+
     # Block 4
-    #x = Conv2D(512, (3, 3), activation='relu', padding='same', name='block4_conv1',use_bias=True)(x_3)
+    x = Conv2D(512, (3, 3), activation='relu', padding='same', name='block4_conv1',use_bias=True)(x)
     x = Conv2D(512, (3, 3), activation='relu', padding='same', name='block4_conv2',use_bias=True)(x)
-    #x = Conv2D(512, (3, 3), activation='relu', padding='same', name='block4_conv3',use_bias=True)(x)
-    #x = MaxPooling2D((2, 2), strides=(2, 2), name='block4_pool')(x)
-    #x= Conv2D(512, (3, 3), strides=(2,2), activation='relu', padding='same', name='block4_conv4',use_bias=True)(x)
+    x = Conv2D(512, (3, 3), activation='relu', padding='same', name='block4_conv3',use_bias=True)(x)
     #deconv block
     #block5
-    x=Lambda(cat)([x,x_3])
+
     x=Conv2DTranspose(256, (3, 3), strides=(2,2), activation='relu', padding='same', name='block5_deconv1',use_bias=True)(x)
+    x = Lambda(cat)([x, x_3])
     x = Conv2DTranspose(256, (3, 3),  activation='relu', padding='same', name='decoder5_deconv2',use_bias=True)(x)
     x = Conv2DTranspose(256, (3, 3), activation='relu', padding='same', name='decoder5_deconv3',use_bias=True)(x)
     x = Conv2DTranspose(256, (3, 3), activation='relu', padding='same', name='decoder5_deconv4',use_bias=True)(x)
+    x_qtr = Conv2D(3, (1, 1), activation='relu', padding='same', name='output_qtr', use_bias=True)(x)
+    ssim_qtr=Lambda(SSIM)([x_qtr,gd_qtr])
+    x=Lambda(cat)([x,x_qtr])
     #block6
-    x = Lambda(cat)([x, x_2])
+
     x = Conv2DTranspose(128, (3, 3), strides=(2, 2), activation='relu', padding='same', name='decoder6_deconv1',
                         use_bias=True)(x)
+    x = Lambda(cat)([x, x_2])
     x = Conv2DTranspose(128, (3, 3), activation='relu', padding='same', name='decoder6_deconv2',
                         use_bias=True)(x)
     x = Conv2DTranspose(128, (3, 3),activation='relu', padding='same', name='decoder6_deconv3',
                         use_bias=True)(x)
+    x_half = Conv2D(3, (3, 3), activation='relu', padding='same', name='output_half', use_bias=True)(x)
+    ssim_half = Lambda(SSIM)([x_half, gd_half])
+    x=Lambda(cat)([x,x_half])
     #block7
-    x = Lambda(cat)([x,x_1])
+
     x = Conv2DTranspose(64, (3, 3), strides=(2, 2), activation='relu', padding='same', name='decoder7_deconv1',
                         use_bias=True)(x)
+    x = Lambda(cat)([x, x_1])
     x = Conv2DTranspose(64, (3, 3),  activation='relu', padding='same', name='decoder7_deconv2',
                         use_bias=True)(x)
     x = Conv2DTranspose(64, (3, 3),  activation='relu', padding='same', name='decoder7_deconv3',
                         use_bias=True)(x)
     x=Conv2D(3, (1, 1), activation='sigmoid', padding='same', name='block8_conv1',use_bias=True)(x)
-    [qmap, qmap_seq, Q]=MEF_SSIM()([ldr_reshape,x])
+    ssim_origin=Lambda(SSIM)([x,gd])
 
-    # Classification block
-    # x = Flatten(name='flatten')(x)
-    # x = Dense(4096, activation='relu', name='fc1')(x)
-    # x = Dense(4096, activation='relu', name='fc2')(x)
-    # x = Dropout(0.5)(x)
-    # x = Dense(10, activation='softmax', name='predictions')(x)
-    return Model(inputs=ldr_tensor,outputs=qmap)
+    return Model(inputs=[ldr_tensor,gd],outputs=[ssim_qtr,ssim_half,ssim_origin])
 def MEF_SSIM_compute(LDRseq, Fused, patch_size=8, adaptive_lum=True, num_seq=3):
     """
     计算多曝光图像融合评价
@@ -166,7 +174,7 @@ def MEF_SSIM_compute(LDRseq, Fused, patch_size=8, adaptive_lum=True, num_seq=3):
     qmap = K.tf.reduce_sum(qmap_seq * K.tf.to_float(patch_index_transformed), axis=1, keep_dims=True, name='qmap')
     Q = K.tf.reduce_mean(qmap, axis=[2, 3], name='Q')
     return [qmap, qmap_seq, Q]
-def GetPatches(images,hdr, patchSize=200, stride=180):
+def GetPatches(images,hdr, patchSize=800, stride=180):
     """
     把图片切分为patches
     :param images: 待切分图像
@@ -228,7 +236,7 @@ def GetPatches2(images, patchSize=200, stride=180):
 
 def load_data(data_path):
         data_list = []
-        #gd_list=[]
+        gd_list=[]
         dirs = os.listdir(data_path)
         for dir in dirs:
             abs_dir = os.path.join(data_path, dir)
@@ -238,19 +246,21 @@ def load_data(data_path):
                 ue_image = img_as_float32(io.imread(img_path[0]))
                 ne_image = img_as_float32(io.imread(img_path[1]))
                 oe_image = img_as_float32(io.imread(img_path[2]))
-                # fused_path=glob.glob(os.path.join(reference_path, "*_15.tif"))
-                # fused_image = img_as_float32(io.imread(fused_path[0]))
+                fused_path=glob.glob(os.path.join(reference_path, "*_15.tif"))
+                fused_image = img_as_float32(io.imread(fused_path[0]))
                 images = np.stack((ue_image, ne_image, oe_image))
-                input_patches= GetPatches2(images)
+                [input_patches,GT_patches]= GetPatches(images,fused_image)
                 data_list.append(input_patches)
-                #gd_list.append(GT_patches)
-        return np.concatenate(data_list)
+                gd_list.append(GT_patches)
+        return np.concatenate(data_list),np.concatenate(gd_list)
 
 def train_model(result_path):
-    model = vgg_16(200,200)
+    X, gd = load_data(result_path)
+    model = vgg_16(800, 800)
     plot_model(model, to_file='./model.png')
-    X = load_data(result_path)
-    Y=np.ones((X.shape[0],X.shape[1],X.shape[2]))
+
+    Y_train=np.ones(X.shape[0]*0.8)
+    Y_test=np.ones(X.shape[0]*0.2)
 
     sgd = SGD(lr=0.001, decay=1e-10, momentum=0.9, nesterov=True)
     model.compile(optimizer=sgd,
@@ -259,16 +269,14 @@ def train_model(result_path):
     model.summary()
     with open("./record.json", "w") as dump_f:
         json.dump(model.to_json(), dump_f)
-    # plot_model(model, show_shapes=True,
-    #            to_file=os.path.join(result_path, 'model.png'))
-
     # split train and test data
 
-    X_train, X_test, Y_train, Y_test = train_test_split(
-        X, Y, test_size=0.2, random_state=2)
+    X_train, X_test, gd_train, gd_test = train_test_split(
+        X, gd, test_size=0.2, random_state=2)
     # input data to model and train
-    history = model.fit(X_train,Y_train, batch_size=2, epochs=10,
-                        validation_data=(X_test,Y_test ), verbose=1, shuffle=True)
+
+    history = model.fit([X_train,gd_train],Y_train, batch_size=2, epochs=10,
+                        validation_data=([X_test,gd_test],Y_test ), verbose=1, shuffle=True)
 
     # evaluate the model
     loss, acc = model.evaluate(X_test, Y_test, verbose=0)
